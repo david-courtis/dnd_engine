@@ -69,6 +69,7 @@ Parameters:
 - `include_skill_calculations` (boolean, optional): Include detailed skill calculations
 - `include_attack_calculations` (boolean, optional): Include detailed attack calculations
 - `include_ac_calculation` (boolean, optional): Include detailed AC calculation
+- `include_saving_throw_calculations` (boolean, optional): Include detailed saving throw calculations
 
 Returns the complete entity snapshot.
 
@@ -88,9 +89,38 @@ Available subblocks:
 
 Returns the requested subblock snapshot.
 
+### Move an entity
+
+```
+POST /api/entities/{entity_uuid}/move
+```
+
+Body:
+
+```json
+{
+  "position": [x, y],
+  "include_paths_senses": false
+}
+```
+
+`include_paths_senses` (boolean, optional) returns vision/path snapshots for each step.
+
+### Attack another entity
+
+```
+POST /api/entities/{entity_uuid}/attack/{target_uuid}
+```
+
+Query Parameters:
+- `weapon_slot` (string, optional, default `MAIN_HAND`): Which weapon to use
+- `attack_name` (string, optional, default `Attack`): Custom name for the action
+
+Returns the attack event along with roll metadata.
+
 ## Interactive Documentation
 
 Once the server is running, you can access the interactive API documentation at:
 
 - Swagger UI: http://localhost:8000/docs
-- ReDoc: http://localhost:8000/redoc 
+- ReDoc: http://localhost:8000/redoc

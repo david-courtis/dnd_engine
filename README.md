@@ -10,6 +10,7 @@ This D&D 5e game engine is built on a sophisticated event-driven architecture wi
 - **Event System**: Event-driven architecture for game state changes
 - **Condition System**: Effects that modify entities through subconditions
 - **Action Framework**: Structured approach to character actions
+- **Movement & Reactions**: Movement actions emit events that can trigger reactions like opportunity attacks
 
 The fundamental principle is that **all game state changes flow through events**, allowing for interception, modification, and reaction at every stage.
 
@@ -20,6 +21,7 @@ All game objects are globally accessible through a UUID-based registry system.
 ### Key Concepts:
 
 - Every game object has a unique UUID that serves as its global identifier
+- Objects can opt out of registration using a `use_register` flag
 - Objects register themselves in class-level registries upon creation
 - Any object can be retrieved from anywhere using its UUID
 - This enables decoupled communication between components
@@ -29,15 +31,26 @@ All game objects are globally accessible through a UUID-based registry system.
 ```python
 class BaseObject(BaseModel):
     uuid: UUID = Field(default_factory=uuid4)
+    use_register: bool = True
     _registry: ClassVar[Dict[UUID, 'BaseObject']] = {}
-    
+
     def __init__(self, **data):
         super().__init__(**data)
-        self.__class__._registry[self.uuid] = self
-        
+        if self.use_register:
+            self.__class__._registry[self.uuid] = self
+
     @classmethod
     def get(cls, uuid: UUID) -> Optional['BaseObject']:
-        return cls._registry.get(uuid)
+        obj = cls._registry.get(uuid)
+        return obj if isinstance(obj, cls) else None
+
+    def add_to_register(self) -> None:
+        self.use_register = True
+        self.__class__._registry[self.uuid] = self
+
+    def remove_from_register(self) -> None:
+        self.use_register = False
+        self.__class__._registry.pop(self.uuid, None)
 ```
 
 This pattern enables any object to look up any other object without direct references, which is foundational for the event system.
@@ -131,7 +144,7 @@ Components interact through:
 Each component specializes in one aspect of game mechanics:
 - **AbilityScores**: Base attributes and modifiers
 - **SkillSet**: Skill proficiencies and bonuses
-- **Health**: Damage tracking and resistances
+- **Health**: Damage tracking and resistances (death saves handled externally)
 - **Equipment**: Weapons, armor, and item effects
 - **ActionEconomy**: Action resource management
 
@@ -211,6 +224,13 @@ def add_event_handler(self, event_handler: EventHandler) -> None:
     for trigger in event_handler.trigger_conditions:
         self.event_handlers_by_trigger[trigger].append(event_handler)
 ```
+
+### 5.6 Movement and Reactions
+
+Movement is implemented as a `Move` action that produces `MovementEvent` objects.
+Event handlers can listen to these events and react during any phase. For example,
+an opportunity attack handler can trigger when a creature leaves a threatened
+space, creating a reaction attack event.
 
 ## 6. Condition System
 
