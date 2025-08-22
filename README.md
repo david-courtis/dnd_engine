@@ -1,6 +1,7 @@
 # D&D 5e Game Engine Architecture Guide
 
 See [API documentation](docs/API.md) for available routes.
+See [API data models](docs/data_models.md) for request and response schemas.
 
 ## 1. Core Architecture Overview
 
