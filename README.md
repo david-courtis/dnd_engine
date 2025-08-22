@@ -1,5 +1,7 @@
 # D&D 5e Game Engine Architecture Guide
 
+See [API documentation](docs/API.md) for available routes.
+
 ## 1. Core Architecture Overview
 
 This D&D 5e game engine is built on a sophisticated event-driven architecture with component-based entities. The system models D&D mechanics through several interacting subsystems:
