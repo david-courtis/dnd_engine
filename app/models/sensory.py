@@ -1,13 +1,9 @@
 from pydantic import BaseModel, Field
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
-from enum import Enum
+from dnd.blocks.sensory import Senses, SensesType
 
-class SensesType(str, Enum):
-    BLINDSIGHT = "Blindsight"
-    DARKVISION = "Darkvision"
-    TREMORSENSE = "Tremorsense"
-    TRUESIGHT = "Truesight"
+
 
 class SensesSnapshot(BaseModel):
     """Interface model for a Senses block"""
@@ -17,15 +13,16 @@ class SensesSnapshot(BaseModel):
     paths: Dict[Tuple[int, int], List[Tuple[int, int]]] = Field(default_factory=dict)
     extra_senses: List[SensesType] = Field(default_factory=list)
     position: Tuple[int, int]
+    seen: List[Tuple[int, int]] = Field(default_factory=list)
 
     @classmethod
-    def from_engine(cls, senses):
-        """Create a snapshot from an engine Senses object"""
+    def from_engine(cls, senses: Senses):
         return cls(
             entities=getattr(senses, "entities", {}),
-            visible=getattr(senses, "visible_tiles", getattr(senses, "visible", {})),
+            visible=getattr(senses, "visible", getattr(senses, "visible_tiles", {})),
             walkable=getattr(senses, "walkable", {}),
             paths=getattr(senses, "paths", {}),
             extra_senses=getattr(senses, "extra_senses", []),
             position=getattr(senses, "position"),
+            seen=list(getattr(senses, "seen", [])),
         )

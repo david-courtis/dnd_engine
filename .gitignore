@@ -10,3 +10,7 @@ dnd.egg-info/SOURCES.txt
 /ui/node_modules
 
 *.coverage
+
+/ui/public/assets/entities
+*.mp3
+/ui/public/assets/effects
