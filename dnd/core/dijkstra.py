@@ -15,12 +15,13 @@ def get_neighbors(position: Tuple[int, int], diagonal: bool, width: int, height:
     return neighbors
 
 def dijkstra(
-    start: Tuple[int, int], 
-    is_walkable: Callable[[int, int], bool], 
-    width: int, 
-    height: int, 
-    diagonal: bool = True, 
+    start: Tuple[int, int],
+    is_walkable: Callable[[int, int], bool],
+    width: int,
+    height: int,
+    diagonal: bool = True,
     max_distance: Optional[int] = None,
+    cost: Optional[Callable[[int, int], int]] = None,
     epsilon: float = 0.001  # Small cost added for diagonal moves
 ) -> Tuple[Dict[Tuple[int, int], int], Dict[Tuple[int, int], List[Tuple[int, int]]]]:
     distances : Dict[Tuple[int, int], float] = {start: 0}
@@ -39,19 +40,23 @@ def dijkstra(
         for neighbor in get_neighbors(current_position, diagonal, width, height):
             if not is_walkable(*neighbor):
                 continue
-            
+
+            move_cost = cost(*neighbor) if cost else 1
+
             # Calculate cost: add epsilon for diagonal moves
             is_diagonal = (neighbor[0] != current_position[0]) and (neighbor[1] != current_position[1])
             additional_cost = epsilon if is_diagonal else 0
-            distance = current_distance + 1 + additional_cost
-            
+
+            distance = current_distance + move_cost + additional_cost
+            true_distance_candidate = true_distances[current_position] + move_cost
+
             if max_distance is not None and distance > max_distance:
                 continue
-            
+
             if neighbor not in distances or distance < distances[neighbor]:
-                
+
                 distances[neighbor] = distance
-                true_distances[neighbor] = int(true_distances[current_position] + 1)  # Keep true distance without epsilon
+                true_distances[neighbor] = int(true_distance_candidate)  # Keep true distance without epsilon
                 paths[neighbor] = paths[current_position] + [neighbor]
                 heapq.heappush(pq, (distance, neighbor))
 

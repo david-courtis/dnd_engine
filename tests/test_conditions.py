@@ -1,8 +1,9 @@
 from uuid import uuid4
 
 from dnd.entity import Entity
-from dnd.conditions import Blinded, Charmed, Dashing
+from dnd.conditions import Blinded, Charmed, Dashing, Poisoned
 from dnd.core.values import AdvantageStatus, AutoHitStatus
+from dnd.core.base_conditions import DurationType
 
 
 def make_entities():
@@ -49,3 +50,34 @@ def test_charmed_modifiers_attack_and_skills():
     assert atk_bonus.auto_hit == AutoHitStatus.NONE
     skill_bonus = charmer.skill_bonus(charmed.uuid, "persuasion")
     assert skill_bonus.advantage == AdvantageStatus.NONE
+
+
+def test_dashing_condition_does_not_stack():
+    source, target = make_entities()
+    base_speed = target.action_economy.movement.normalized_score
+    first = Dashing(source_entity_uuid=source.uuid, target_entity_uuid=target.uuid)
+    target.add_condition(first)
+    assert target.action_economy.movement.normalized_score == base_speed * 2
+    second = Dashing(source_entity_uuid=source.uuid, target_entity_uuid=target.uuid)
+    target.add_condition(second)
+    assert target.action_economy.movement.normalized_score == base_speed * 2
+    assert target.active_conditions["Dashing"].uuid == second.uuid
+
+
+def test_poisoned_condition_duration_counts_down_and_expires():
+    source, target = make_entities()
+    condition = Poisoned(source_entity_uuid=source.uuid, target_entity_uuid=target.uuid)
+    condition.duration.duration_type = DurationType.ROUNDS
+    condition.duration.duration = 2
+    target.add_condition(condition)
+    assert target.equipment.attack_bonus.advantage == AdvantageStatus.DISADVANTAGE
+    acrobatics = target.skill_set.get_skill("acrobatics")
+    assert acrobatics.skill_bonus.advantage == AdvantageStatus.DISADVANTAGE
+    removed = target.advance_duration_condition("Poisoned")
+    assert not removed
+    assert target.equipment.attack_bonus.advantage == AdvantageStatus.DISADVANTAGE
+    removed = target.advance_duration_condition("Poisoned")
+    assert removed
+    assert target.equipment.attack_bonus.advantage == AdvantageStatus.NONE
+    assert acrobatics.skill_bonus.advantage == AdvantageStatus.NONE
+

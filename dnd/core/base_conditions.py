@@ -50,7 +50,7 @@ class Duration(BaseObject):
         """ Check if the duration is expired """
         if self.duration_type == DurationType.ROUNDS:
             assert isinstance(self.duration,int)
-            return self.duration >= 0
+            return self.duration <= 0
         elif self.duration_type == DurationType.ON_CONDITION:
             assert isinstance(self.duration,ContextAwareCondition)
             duration = self.duration(self.source_entity_uuid,self.target_entity_uuid,self.context)

@@ -11,18 +11,19 @@ from functools import cached_property
 from typing import Literal as TypeLiteral
 from collections import defaultdict
 from dnd.core.shadowcast import compute_fov
-from dnd.core.dijkstra import dijkstra
+from dnd.core.dijkstra import dijkstra, get_neighbors
 
 
 
 class Tile(BaseObject):
-    name: str = Field(default="Floor",description="The name of the tile")
-    position: Tuple[int,int] = Field(description="The position of the tile on the grid")
-    walkable: bool = Field(default=True,description="Whether the tile can be walked on")
-    visible: bool = Field(default=True,description="Whether the tile can be seen through")
-    sprite_name: Optional[str] = Field(default=None,description="The name of the sprite to use for the tile")
+    name: str = Field(default="Floor", description="The name of the tile")
+    position: Tuple[int, int] = Field(description="The position of the tile on the grid")
+    movement_cost: int = Field(default=1, ge=1, description="Cost to move onto this tile")
+    blocks_movement: bool = Field(default=False, description="Whether the tile blocks movement")
+    blocks_vision: bool = Field(default=False, description="Whether the tile blocks line of sight")
+    sprite_name: Optional[str] = Field(default=None, description="The name of the sprite to use for the tile")
     _tile_registry: ClassVar[Dict[UUID, 'Tile']] = {}
-    _tile_by_position: ClassVar[Dict[Tuple[int,int], 'Tile']] = {}
+    _tile_by_position: ClassVar[Dict[Tuple[int, int], 'Tile']] = {}
 
     def __init__(self, **data):
         """
@@ -51,10 +52,36 @@ class Tile(BaseObject):
     def grid_size(cls) -> Tuple[int,int]:
         return max(tile.position[0] for tile in cls.get_all_tiles()) + 1, max(tile.position[1] for tile in cls.get_all_tiles()) + 1
     
+    @computed_field(return_type=bool)
+    def walkable(self) -> bool:
+        return not self.blocks_movement
+
+    @computed_field(return_type=bool)
+    def visible(self) -> bool:
+        return not self.blocks_vision
+
     @classmethod
-    def create(cls, position: Tuple[int,int], sprite_name: Optional[str] = None, can_walk: bool = True, can_see: bool = True,name:str = "Floor") -> 'Tile':
+    def create(
+        cls,
+        position: Tuple[int, int],
+        sprite_name: Optional[str] = None,
+        can_walk: bool = True,
+        can_see: bool = True,
+        movement_cost: int = 1,
+        name: str = "Floor",
+    ) -> 'Tile':
         tile_uuid = uuid4()
-        return cls(uuid=tile_uuid,source_entity_uuid=tile_uuid,target_entity_uuid=tile_uuid, position=position, sprite_name=sprite_name, walkable=can_walk, visible=can_see,name=name)
+        return cls(
+            uuid=tile_uuid,
+            source_entity_uuid=tile_uuid,
+            target_entity_uuid=tile_uuid,
+            position=position,
+            sprite_name=sprite_name,
+            blocks_movement=not can_walk,
+            blocks_vision=not can_see,
+            movement_cost=movement_cost,
+            name=name,
+        )
 
     @classmethod
     def is_visible(cls, position: Tuple[int,int]) -> bool:
@@ -86,7 +113,7 @@ class Tile(BaseObject):
         
         def is_blocking(x: int, y: int) -> bool:
             tile = cls.get_tile_at_position((x, y))
-            return tile is None or not tile.visible
+            return tile is None or tile.blocks_vision
             
         def mark_visible(x: int, y: int) -> None:
             visible_positions.append((x, y))
@@ -113,8 +140,20 @@ class Tile(BaseObject):
         def is_walkable(x: int, y: int) -> bool:
             tile = cls.get_tile_at_position((x, y))
             return tile is not None and tile.walkable
-            
-        return dijkstra(start_pos, is_walkable, width, height, diagonal=True, max_distance=max_distance)
+
+        def cost(x: int, y: int) -> int:
+            tile = cls.get_tile_at_position((x, y))
+            return tile.movement_cost if tile else 1
+
+        return dijkstra(start_pos, is_walkable, width, height, diagonal=True, max_distance=max_distance, cost=cost)
+
+    @classmethod
+    def get_adjacent_positions(cls, position: Tuple[int, int], diagonal: bool = True) -> List[Tuple[int, int]]:
+        tile = cls.get_tile_at_position(position)
+        if tile is None:
+            return []
+        width, height = cls.grid_size()
+        return get_neighbors(position, diagonal, width, height)
 
 
 def floor_factory(position: Tuple[int,int]) -> Tile:

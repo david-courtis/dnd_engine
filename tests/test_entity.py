@@ -7,12 +7,13 @@ from dnd.blocks.abilities import AbilityScoresConfig
 from dnd.blocks.skills import SkillSetConfig
 from dnd.blocks.saving_throws import SavingThrowSetConfig
 from dnd.blocks.health import HealthConfig, HitDiceConfig
-from dnd.blocks.equipment import EquipmentConfig, Damage
+from dnd.blocks.equipment import EquipmentConfig, Damage, Ring, ArmorType
 from dnd.blocks.action_economy import ActionEconomyConfig
 from dnd.core.modifiers import DamageType
 from dnd.core.dice import AttackOutcome
 from dnd.core.events import RangeType
 from dnd.core.values import ModifiableValue
+from dnd.conditions import Dodging
 
 
 def create_basic_entity():
@@ -75,6 +76,11 @@ def test_action_economy_can_afford_and_consume():
     with pytest.raises(ValueError):
         ae.consume("actions", 1)
 
+    assert ae.can_afford("bonus_actions", 1)
+    ae.consume("bonus_actions", 1)
+    with pytest.raises(ValueError):
+        ae.consume("bonus_actions", 1)
+
 
 def test_entity_range_and_bonuses():
     entity = create_basic_entity()
@@ -84,3 +90,40 @@ def test_entity_range_and_bonuses():
 
     assert entity.attack_bonus().normalized_score == 2
     assert entity.ac_bonus().normalized_score == 10
+
+
+def test_target_selection_and_clearing():
+    attacker = create_basic_entity()
+    target = create_basic_entity()
+
+    assert attacker.get_target_entity() is None
+
+    attacker.set_target_entity(target.uuid)
+    assert attacker.get_target_entity() is target
+
+    attacker.clear_target_entity()
+    assert attacker.get_target_entity() is None
+
+
+def test_condition_application_and_removal_affects_equipment():
+    entity = create_basic_entity()
+    condition = Dodging(source_entity_uuid=entity.uuid, target_entity_uuid=entity.uuid)
+
+    assert len(entity.equipment.ac_bonus.to_target_static.advantage_modifiers) == 0
+
+    entity.add_condition(condition)
+    assert "Dodging" in entity.active_conditions
+    assert len(entity.equipment.ac_bonus.to_target_static.advantage_modifiers) == 1
+
+    entity.remove_condition("Dodging")
+    assert "Dodging" not in entity.active_conditions
+    assert len(entity.equipment.ac_bonus.to_target_static.advantage_modifiers) == 0
+
+
+def test_equipment_invalid_ring_slot():
+    entity = create_basic_entity()
+    ring = Ring(source_entity_uuid=entity.uuid, target_entity_uuid=entity.uuid, type=ArmorType.CLOTH)
+
+    with pytest.raises(ValueError):
+        entity.equipment.equip(ring)
+

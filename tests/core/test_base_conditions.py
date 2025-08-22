@@ -129,3 +129,78 @@ def test_condition_application_and_removal_phases():
         EventPhase.EFFECT,
         EventPhase.COMPLETION,
     ]
+
+
+# ---------------------------------------------------------------------------
+# Apply/unapply and tick behavior across Duration types
+# ---------------------------------------------------------------------------
+
+
+def _make_condition(duration: Duration) -> DummyCondition:
+    return DummyCondition(
+        name="dummy",
+        source_entity_uuid=uuid4(),
+        target_entity_uuid=uuid4(),
+        duration=duration,
+    )
+
+
+def test_rounds_duration_apply_tick_and_expire():
+    condition = _make_condition(Duration(duration=2, duration_type=DurationType.ROUNDS))
+
+    assert isinstance(condition.apply(), ConditionApplicationEvent)
+    assert condition.applied is True
+
+    assert condition.progress() is False  # 1 round left
+    assert condition.duration.duration == 1
+
+    assert condition.progress() is True  # expires and removes
+    assert condition.applied is False
+    removal_event = EventQueue.get_events_by_type(EventType.CONDITION_REMOVAL)[-1]
+    assert removal_event.expired is True
+
+
+def test_permanent_duration_apply_unapply_and_tick():
+    condition = _make_condition(Duration(duration=None, duration_type=DurationType.PERMANENT))
+
+    condition.apply()
+    assert condition.applied is True
+    assert condition.progress() is False  # no expiration
+
+    assert condition.remove() is True
+    assert condition.applied is False
+    removal_event = EventQueue.get_events_by_type(EventType.CONDITION_REMOVAL)[-1]
+    assert removal_event.expired is False
+
+
+def test_on_condition_duration_apply_tick_and_manual_unapply(monkeypatch):
+    import collections.abc
+    monkeypatch.setattr(
+        "dnd.core.base_conditions.ContextAwareCondition", collections.abc.Callable
+    )
+
+    trigger = {"expired": False}
+
+    def end_condition(source, target, context):
+        return context["expired"]
+
+    duration = Duration(
+        duration=end_condition,
+        duration_type=DurationType.ON_CONDITION,
+        context=trigger,
+    )
+
+    condition = _make_condition(duration)
+
+    condition.apply()
+    assert condition.applied is True
+    assert condition.progress() is False
+
+    trigger["expired"] = True
+    assert end_condition(None, None, trigger) is True
+    assert condition.progress() is False  # does not auto-remove
+    assert condition.applied is True
+
+    assert condition.remove(expire=True) is True
+    removal_event = EventQueue.get_events_by_type(EventType.CONDITION_REMOVAL)[-1]
+    assert removal_event.expired is True

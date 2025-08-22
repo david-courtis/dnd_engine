@@ -8,6 +8,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from dnd.entity import Entity
 from dnd.conditions import Poisoned, Grappled, Invisible, Prone
 from dnd.core.modifiers import AdvantageStatus
+from dnd.core.base_conditions import DurationType
 
 
 def test_poisoned_applies_and_removes_disadvantage():
@@ -65,3 +66,33 @@ def test_prone_disadvantage_and_attackers_advantage():
     condition.remove()
     assert target.equipment.attack_bonus.advantage == AdvantageStatus.NONE
     assert len(target.equipment.ac_bonus.to_target_contextual.advantage_modifiers) == 0
+
+
+def test_poisoned_does_not_stack():
+    source = Entity.create(source_entity_uuid=uuid4(), name="Source")
+    target = Entity.create(source_entity_uuid=uuid4(), name="Target")
+    base_skill = target.skill_set.get_skill("acrobatics").skill_bonus.advantage
+    first = Poisoned(source_entity_uuid=source.uuid, target_entity_uuid=target.uuid)
+    target.add_condition(first)
+    assert target.equipment.attack_bonus.advantage == AdvantageStatus.DISADVANTAGE
+    second = Poisoned(source_entity_uuid=source.uuid, target_entity_uuid=target.uuid)
+    target.add_condition(second)
+    assert target.equipment.attack_bonus.advantage == AdvantageStatus.DISADVANTAGE
+    assert target.active_conditions["Poisoned"].uuid == second.uuid
+    target.remove_condition("Poisoned")
+    assert target.equipment.attack_bonus.advantage == AdvantageStatus.NONE
+    assert target.skill_set.get_skill("acrobatics").skill_bonus.advantage == base_skill
+
+
+def test_grappled_condition_duration_expires_and_restores_speed():
+    source = Entity.create(source_entity_uuid=uuid4(), name="Source")
+    target = Entity.create(source_entity_uuid=uuid4(), name="Target")
+    base_speed = target.action_economy.movement.normalized_score
+    condition = Grappled(source_entity_uuid=source.uuid, target_entity_uuid=target.uuid)
+    condition.duration.duration_type = DurationType.ROUNDS
+    condition.duration.duration = 1
+    target.add_condition(condition)
+    assert target.action_economy.movement.normalized_score == 0
+    removed = target.advance_duration_condition("Grappled")
+    assert removed
+    assert target.action_economy.movement.normalized_score == base_speed

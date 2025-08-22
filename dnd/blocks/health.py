@@ -285,6 +285,10 @@ class Health(BaseBlock):
     temporary_hit_points: ModifiableValue = Field(default_factory=lambda: ModifiableValue.create(source_entity_uuid=uuid4(),base_value=0, value_name="Temporary Hit Points"), description="Temporary Hit Points, e.g. False Life spell")
     damage_taken: int = Field(default=0,ge=0, description="The amount of damage taken")
     damage_reduction: ModifiableValue = Field(default_factory=lambda: ModifiableValue.create(source_entity_uuid=uuid4(),base_value=0, value_name="Damage Reduction"), description="Damage Reduction, e.g. Damage Resistance")
+    death_save_successes: int = Field(default=0, ge=0, description="Number of successful death saving throws")
+    death_save_failures: int = Field(default=0, ge=0, description="Number of failed death saving throws")
+    is_dead: bool = Field(default=False, description="Flag indicating whether the creature is dead")
+    is_stable: bool = Field(default=False, description="Flag indicating whether the creature is stable at 0 HP")
 
     def get_resistance(self,damage_type: DamageType) -> ResistanceStatus:
         return self.damage_reduction.resistance[damage_type]
@@ -373,7 +377,13 @@ class Health(BaseBlock):
         damage_to_temporaty_hp = current_temporary_hit_points if residual_damage > 0 else damage_after_multiplier
         self.remove_temporary_hit_points(damage_to_temporaty_hp, source_entity_uuid)
         if residual_damage > 0:
+            at_zero = self.get_total_hit_points(0) <= 0
             self.add_damage(residual_damage)
+            if at_zero and not self.is_dead:
+                self.is_stable = False
+                self.death_save_failures += 1
+                if self.death_save_failures >= 3:
+                    self.is_dead = True
             return residual_damage
         else:
             return 0
@@ -397,6 +407,11 @@ class Health(BaseBlock):
         else:
             #if we have no temporary hit points we can heal the damage taken
             self.damage_taken = max(0, self.damage_taken - heal)
+        if heal > 0:
+            self.death_save_successes = 0
+            self.death_save_failures = 0
+            self.is_stable = False
+            self.is_dead = False
 
     def add_temporary_hit_points(self, temporary_hit_points: int, source_entity_uuid: UUID) -> None:
         """
@@ -426,6 +441,35 @@ class Health(BaseBlock):
         else:
             
             self.temporary_hit_points.self_static.add_value_modifier(modifier)
+
+    def roll_death_save(self, roll: int) -> bool:
+        """Resolve a death saving throw roll.
+
+        Args:
+            roll (int): The d20 roll result.
+
+        Returns:
+            bool: True if the roll counts as a success, False otherwise.
+        """
+        if roll == 1:
+            self.death_save_failures += 2
+        elif roll == 20:
+            self.death_save_successes = 3
+        elif roll >= 10:
+            self.death_save_successes += 1
+        else:
+            self.death_save_failures += 1
+
+        if self.death_save_successes >= 3:
+            self.death_save_successes = 0
+            self.death_save_failures = 0
+            self.is_stable = True
+            self.remove_damage(1)
+            return True
+        if self.death_save_failures >= 3:
+            self.is_dead = True
+            return False
+        return roll >= 10
 
     def get_max_hit_dices_points(self, constitution_modifier: int) -> int:
         """

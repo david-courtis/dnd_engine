@@ -1,7 +1,10 @@
 from collections import OrderedDict
 from uuid import uuid4
 
-from dnd.core.base_actions import BaseAction, StructuredAction, Cost
+import pytest
+from pydantic import ValidationError
+
+from dnd.core.base_actions import ActionEvent, BaseAction, StructuredAction, Cost
 from dnd.core.events import EventQueue, EventType, EventPhase
 
 
@@ -73,3 +76,45 @@ def test_structured_action_failing_prerequisite_cancels():
     result = action.apply()
     assert result.canceled is True
     assert result.phase == EventPhase.CANCEL
+
+
+def test_invalid_cost_type_raises_error():
+    with pytest.raises(ValidationError):
+        Cost(cost_type="time", cost=1)
+
+
+def test_action_event_phase_transitions_without_cancellation():
+    source = uuid4()
+    target = uuid4()
+    event = ActionEvent.from_costs([], source, target)
+    assert event.phase == EventPhase.DECLARATION
+    execution = event.phase_to()
+    assert execution.phase == EventPhase.EXECUTION
+    effect = execution.phase_to()
+    assert effect.phase == EventPhase.EFFECT
+    completion = effect.phase_to()
+    assert completion.phase == EventPhase.COMPLETION
+
+
+def test_action_event_cancellation():
+    source = uuid4()
+    target = uuid4()
+    event = ActionEvent.from_costs([], source, target)
+    canceled = event.cancel(status_message="stop")
+    assert canceled.canceled is True
+    assert canceled.phase == EventPhase.CANCEL
+
+
+def test_default_cost_handling_without_evaluator():
+    action = BaseAction(
+        name="DefaultCost",
+        description="desc",
+        source_entity_uuid=uuid4(),
+        target_entity_uuid=uuid4(),
+        costs=[Cost(cost_type="actions", cost=1)],
+    )
+
+    result = action.apply()
+    assert result is not None
+    assert result.phase == EventPhase.COMPLETION
+    assert result.costs[0].cost_type == "actions"
