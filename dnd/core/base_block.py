@@ -1,6 +1,6 @@
 from typing import Dict, Optional, Any, List, Self, Literal,ClassVar, Union, Callable, Tuple
 from uuid import UUID, uuid4
-from pydantic import BaseModel, Field, model_validator, computed_field,field_validator
+from pydantic import BaseModel, Field, model_validator, computed_field, field_validator, ConfigDict
 from dnd.core.values import ModifiableValue, StaticValue
 from dnd.core.modifiers import NumericalModifier, DamageType , ResistanceStatus, ContextAwareCondition, BaseObject, saving_throws, ResistanceModifier
 from dnd.core.base_conditions import BaseCondition
@@ -147,8 +147,7 @@ class BaseBlock(BaseModel):
 
     _registry: ClassVar[Dict[UUID, 'BaseBlock']] = {}
 
-    class Config:
-        validate_assignment = False
+    model_config = ConfigDict(validate_assignment=False)
 
     def _set_values_and_blocks_source(self, block: 'BaseBlock') -> None:
         """

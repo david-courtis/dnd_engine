@@ -8,3 +8,5 @@ dnd.egg-info/SOURCES.txt
 /.venv
 
 /ui/node_modules
+
+*.coverage

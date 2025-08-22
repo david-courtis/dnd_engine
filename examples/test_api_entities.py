@@ -20,7 +20,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Import entity and interface modules
 from dnd.entity import Entity
 from dnd.monsters.circus_fighter import create_warrior
-from dnd.interfaces.entity import EntitySnapshot
+from app.models.entity import EntitySnapshot
 
 # Configuration
 API_BASE_URL = "http://localhost:8000/api"
@@ -172,19 +172,19 @@ def test_entity_matches_api():
         
         # Get appropriate snapshot based on subblock type
         if subblock == "health":
-            from dnd.interfaces.health import HealthSnapshot
+            from app.models.health import HealthSnapshot
             local_subblock_snapshot = HealthSnapshot.from_engine(local_subblock_obj, local_warrior)
         elif subblock == "ability_scores":
-            from dnd.interfaces.abilities import AbilityScoresSnapshot
+            from app.models.abilities import AbilityScoresSnapshot
             local_subblock_snapshot = AbilityScoresSnapshot.from_engine(local_subblock_obj)
         elif subblock == "skill_set":
-            from dnd.interfaces.skills import SkillSetSnapshot
+            from app.models.skills import SkillSetSnapshot
             local_subblock_snapshot = SkillSetSnapshot.from_engine(local_subblock_obj, local_warrior)
         elif subblock == "equipment":
-            from dnd.interfaces.equipment import EquipmentSnapshot
+            from app.models.equipment import EquipmentSnapshot
             local_subblock_snapshot = EquipmentSnapshot.from_engine(local_subblock_obj)
         elif subblock == "saving_throws":
-            from dnd.interfaces.saving_throws import SavingThrowSetSnapshot
+            from app.models.saving_throws import SavingThrowSetSnapshot
             local_subblock_snapshot = SavingThrowSetSnapshot.from_engine(local_subblock_obj, local_warrior)
             
         if local_subblock_snapshot:
@@ -206,4 +206,4 @@ if __name__ == "__main__":
     print("Starting API entity test...")
     print("Note: Ensure the FastAPI server is running on http://localhost:8000")
     print()
-    test_entity_matches_api() 
+    test_entity_matches_api()
