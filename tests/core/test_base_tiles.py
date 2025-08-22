@@ -26,6 +26,15 @@ def test_create_and_lookup():
     assert tile is not None and tile.position == (1, 1)
 
 
+def test_invalid_position_checks():
+    Tile.create((0, 0))
+
+    assert Tile.get_tile_at_position((1, 1)) is None
+    assert not Tile.is_visible((1, 1))
+    assert not Tile.is_walkable((1, 1))
+    assert Tile.get_adjacent_positions((1, 1)) == []
+
+
 def test_fov_with_blocking_tile():
     for x in range(3):
         for y in range(3):
@@ -40,15 +49,33 @@ def test_fov_with_blocking_tile():
     assert (2, 1) in visible_inside
 
 
-def test_get_paths_with_obstacles_and_limits():
+def test_get_paths_with_obstacles_costs_and_limits():
     for x in range(3):
         for y in range(3):
             Tile.create((x, y))
     Tile.create((1, 0), can_walk=False, can_see=False)
+    Tile.create((0, 1), movement_cost=3)
 
     distances, paths = Tile.get_paths((0, 0))
     assert distances[(2, 0)] == 2
     assert paths[(2, 0)] == [(0, 0), (1, 1), (2, 0)]
+    assert distances[(0, 1)] == 3
+    assert paths[(0, 1)] == [(0, 0), (0, 1)]
 
     limited_distances, _ = Tile.get_paths((0, 0), max_distance=1)
     assert (2, 0) not in limited_distances
+
+
+def test_adjacency_calculation():
+    for x in range(3):
+        for y in range(3):
+            Tile.create((x, y))
+
+    adj = set(Tile.get_adjacent_positions((1, 1)))
+    expected = {
+        (0, 0), (0, 1), (0, 2),
+        (1, 0),         (1, 2),
+        (2, 0), (2, 1), (2, 2),
+    }
+    assert adj == expected
+

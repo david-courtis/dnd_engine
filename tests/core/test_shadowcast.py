@@ -1,9 +1,11 @@
 import os
 import sys
 
+import pytest
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..")))
 
-from dnd.core.shadowcast import compute_fov
+from dnd.core.shadowcast import Quadrant, compute_fov
 
 
 def test_compute_fov_respects_walls_and_max_distance():
@@ -25,3 +27,8 @@ def test_compute_fov_respects_walls_and_max_distance():
     assert (4, 2) not in visible
     assert (2, 4) in visible
     assert (4, 4) not in visible
+
+
+def test_quadrant_raises_for_invalid_cardinal():
+    with pytest.raises(ValueError):
+        Quadrant(4, (0, 0))

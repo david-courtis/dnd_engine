@@ -2,6 +2,7 @@ import random
 from uuid import uuid4
 
 import pytest
+from pydantic import ValidationError
 
 from dnd.core.dice import Dice, RollType, AttackOutcome, DiceRoll
 from dnd.core.values import ModifiableValue, AdvantageStatus, CriticalStatus, AutoHitStatus
@@ -102,3 +103,59 @@ def test_determine_attack_outcome_auto_statuses():
         "auto_hit_status": AutoHitStatus.AUTOMISS,
     })
     assert determine_attack_outcome(dice_roll, 1) == AttackOutcome.MISS
+
+
+def test_custom_dice_notation_parsing_failure():
+    bonus = make_bonus()
+    with pytest.raises(ValidationError):
+        Dice(
+            count="2d6+3",
+            value=6,
+            bonus=bonus,
+            roll_type=RollType.DAMAGE,
+            attack_outcome=AttackOutcome.HIT,
+        )
+
+
+def test_determine_attack_outcome_critical_adjustments():
+    dice_roll = DiceRoll(
+        dice_uuid=uuid4(),
+        roll_type=RollType.ATTACK,
+        results=15,
+        total=18,
+        bonus=3,
+        advantage_status=AdvantageStatus.NONE,
+        critical_status=CriticalStatus.AUTOCRIT,
+        auto_hit_status=AutoHitStatus.NONE,
+        source_entity_uuid=uuid4(),
+    )
+    assert determine_attack_outcome(dice_roll, 18) == AttackOutcome.CRIT
+
+    dice_roll = dice_roll.model_copy(update={"results": 1, "total": 1})
+    assert determine_attack_outcome(dice_roll, 0) == AttackOutcome.CRIT_MISS
+
+
+def test_average_roll_calculation(monkeypatch):
+    bonus = make_bonus(2)
+    sequence = [1, 2, 3, 4, 5, 6]
+
+    def fake_randint(a, b):
+        val = sequence.pop(0)
+        sequence.append(val)
+        return val
+
+    monkeypatch.setattr("dnd.core.dice.random.randint", fake_randint)
+
+    rolls = []
+    for _ in range(6):
+        dice = Dice(
+            count=1,
+            value=6,
+            bonus=bonus,
+            roll_type=RollType.DAMAGE,
+            attack_outcome=AttackOutcome.HIT,
+        )
+        rolls.append(dice.roll.total)
+
+    expected_avg = (6 + 1) / 2 + bonus.normalized_score
+    assert sum(rolls) / len(rolls) == expected_avg

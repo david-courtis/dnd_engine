@@ -22,10 +22,10 @@ class SensesSnapshot(BaseModel):
     def from_engine(cls, senses):
         """Create a snapshot from an engine Senses object"""
         return cls(
-            entities=senses.entities,
-            visible=senses.visible,
-            walkable=senses.walkable,
-            paths=senses.paths,
-            extra_senses=senses.extra_senses,
-            position=senses.position
+            entities=getattr(senses, "entities", {}),
+            visible=getattr(senses, "visible_tiles", getattr(senses, "visible", {})),
+            walkable=getattr(senses, "walkable", {}),
+            paths=getattr(senses, "paths", {}),
+            extra_senses=getattr(senses, "extra_senses", []),
+            position=getattr(senses, "position"),
         )

@@ -138,8 +138,41 @@ class BaseValue(BaseObject):
             raise ValueError(f"Value with UUID {uuid} is not a BaseValue, but {type(value)}")
 
     
-    def validate_modifier_target(self, modifier: Union[NumericalModifier, AdvantageModifier, CriticalModifier, AutoHitModifier, SizeModifier, DamageTypeModifier, ResistanceModifier, ContextualNumericalModifier, ContextualAdvantageModifier, ContextualCriticalModifier, ContextualAutoHitModifier, ContextualSizeModifier, ContextualDamageTypeModifier, ContextualResistanceModifier]) -> None:
-        pass
+    def validate_modifier_target(
+        self,
+        modifier: Union[
+            NumericalModifier,
+            AdvantageModifier,
+            CriticalModifier,
+            AutoHitModifier,
+            SizeModifier,
+            DamageTypeModifier,
+            ResistanceModifier,
+            ContextualNumericalModifier,
+            ContextualAdvantageModifier,
+            ContextualCriticalModifier,
+            ContextualAutoHitModifier,
+            ContextualSizeModifier,
+            ContextualDamageTypeModifier,
+            ContextualResistanceModifier,
+        ],
+    ) -> None:
+        """Ensure a modifier is targeted at the correct entity for this value.
+
+        For non-outgoing values the modifier must target ``source_entity_uuid``.
+        For values marked as outgoing the modifier should target
+        ``target_entity_uuid``.  Raises ``ValueError`` if the target is
+        mismatched or undefined.
+        """
+
+        expected_target = (
+            self.target_entity_uuid
+            if getattr(self, "is_outgoing_modifier", False)
+            else self.source_entity_uuid
+        )
+
+        if expected_target is None or modifier.target_entity_uuid != expected_target:
+            raise ValueError("Modifier target entity UUID does not match value")
 
     def get_generation_chain(self) -> List['BaseValue']:
         chain = []
