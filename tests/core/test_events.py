@@ -86,7 +86,7 @@ def test_event_handler_modifies_event():
         trigger_conditions=[trigger],
         event_processor=processor,
     )
-    EventQueue.add_event_handler(EventType.MOVEMENT, EventPhase.DECLARATION, source, handler)
+    EventQueue.add_event_handler(handler)
 
     Event(event_type=EventType.MOVEMENT, source_entity_uuid=source, target_entity_uuid=target)
     updated = EventQueue.get_events_by_type(EventType.MOVEMENT)[-1]
@@ -140,9 +140,9 @@ def test_event_handlers_progress_through_all_phases():
         EventHandler(source_entity_uuid=source, target_entity_uuid=source, trigger_conditions=[triggers[1]], event_processor=execution),
         EventHandler(source_entity_uuid=source, target_entity_uuid=source, trigger_conditions=[triggers[2]], event_processor=effect),
     ]
-    EventQueue.add_event_handler(EventType.HEAL, EventPhase.DECLARATION, source, handlers[0])
-    EventQueue.add_event_handler(EventType.HEAL, EventPhase.EXECUTION, source, handlers[1])
-    EventQueue.add_event_handler(EventType.HEAL, EventPhase.EFFECT, source, handlers[2])
+    EventQueue.add_event_handler(handlers[0])
+    EventQueue.add_event_handler(handlers[1])
+    EventQueue.add_event_handler(handlers[2])
 
     Event(event_type=EventType.HEAL, source_entity_uuid=source, target_entity_uuid=target)
     final = EventQueue.get_events_by_type(EventType.HEAL)[-1]
@@ -174,7 +174,7 @@ def test_event_handler_cancels_event():
         trigger_conditions=[trigger],
         event_processor=canceler,
     )
-    EventQueue.add_event_handler(EventType.CAST_SPELL, EventPhase.EXECUTION, source, handler)
+    EventQueue.add_event_handler(handler)
 
     Event(event_type=EventType.CAST_SPELL, source_entity_uuid=source, target_entity_uuid=target).phase_to(EventPhase.EXECUTION)
     canceled = EventQueue.get_events_by_type(EventType.CAST_SPELL)[-1]
@@ -213,7 +213,7 @@ def test_nested_dispatch_and_context_propagation():
         trigger_conditions=[child_trigger],
         event_processor=child_processor,
     )
-    EventQueue.add_event_handler(EventType.DICE_ROLL, EventPhase.DECLARATION, source, child_handler)
+    EventQueue.add_event_handler(child_handler)
 
     def parent_processor(evt, ctx):
         child = Event(event_type=EventType.DICE_ROLL, source_entity_uuid=ctx, target_entity_uuid=evt.target_entity_uuid)
@@ -233,7 +233,7 @@ def test_nested_dispatch_and_context_propagation():
         trigger_conditions=[parent_trigger],
         event_processor=parent_processor,
     )
-    EventQueue.add_event_handler(EventType.ATTACK, EventPhase.EXECUTION, source, parent_handler)
+    EventQueue.add_event_handler(parent_handler)
 
     event = Event(event_type=EventType.ATTACK, source_entity_uuid=source, target_entity_uuid=target)
     final = event.phase_to(EventPhase.EXECUTION)
@@ -299,7 +299,7 @@ def test_register_populates_indices_and_handlers():
         trigger_conditions=[trigger],
         event_processor=processor,
     )
-    EventQueue.add_event_handler(EventType.BASE_ACTION, EventPhase.DECLARATION, source, handler)
+    EventQueue.add_event_handler(handler)
 
     raw = Event(event_type=EventType.BASE_ACTION, source_entity_uuid=source, target_entity_uuid=target)
     modified = EventQueue.get_events_by_type(EventType.BASE_ACTION)[-1]
@@ -325,7 +325,7 @@ def test_add_and_remove_event_handler_methods():
         event_processor=lambda e, _: e,
     )
 
-    EventQueue.add_event_handler(EventType.ATTACK, EventPhase.DECLARATION, source, handler)
+    EventQueue.add_event_handler(handler)
     assert handler.uuid in EventQueue._event_handlers
     assert handler in EventQueue._event_handlers_by_trigger[trigger]
     assert handler in EventQueue._event_handlers_by_source_entity_uuid[source]
@@ -335,7 +335,7 @@ def test_add_and_remove_event_handler_methods():
     assert handler not in EventQueue._event_handlers_by_trigger[trigger]
     assert handler not in EventQueue._event_handlers_by_source_entity_uuid[source]
 
-    EventQueue.add_event_handler(EventType.ATTACK, EventPhase.DECLARATION, source, handler)
+    EventQueue.add_event_handler(handler)
     assert handler.uuid in EventQueue._event_handlers
     EventQueue.remove_event_handlers_by_uuid(handler.uuid)
     assert handler.uuid not in EventQueue._event_handlers
@@ -429,7 +429,7 @@ def test_event_post_raises_type_error_on_wrong_type():
     )
 
     event = SavingThrowEvent(ability_name="strength", source_entity_uuid=source, target_entity_uuid=target)
-    EventQueue.add_event_handler(EventType.SAVING_THROW, EventPhase.DECLARATION, source, handler)
+    EventQueue.add_event_handler(handler)
     with pytest.raises(TypeError):
         event.post(status_message="oops")
 
@@ -523,7 +523,7 @@ def test_event_handler_remove():
     # not registered
     assert handler.remove() is False
 
-    EventQueue.add_event_handler(EventType.ATTACK, EventPhase.DECLARATION, entity.uuid, handler)
+    EventQueue.add_event_handler(handler)
     entity.event_handlers[handler.uuid] = handler
     assert handler.remove() is True
     assert handler.uuid not in entity.event_handlers
@@ -548,7 +548,7 @@ def test_register_stops_on_none_from_handler():
         trigger_conditions=[trigger],
         event_processor=processor,
     )
-    EventQueue.add_event_handler(EventType.HEAL, EventPhase.DECLARATION, source, handler)
+    EventQueue.add_event_handler(handler)
     event = Event(event_type=EventType.HEAL, source_entity_uuid=source, target_entity_uuid=target)
     assert EventQueue.get_event_by_uuid(event.uuid) is event
 
@@ -567,7 +567,7 @@ def test_simple_trigger_registration_and_lookup():
         trigger_conditions=[trigger],
         event_processor=processor,
     )
-    EventQueue.add_event_handler(EventType.ATTACK, EventPhase.DECLARATION, source, handler)
+    EventQueue.add_event_handler(handler)
     key = trigger.get_simple_trigger()
     assert handler in EventQueue._event_handlers_by_simple_trigger[key]
 

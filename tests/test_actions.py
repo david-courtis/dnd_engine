@@ -281,7 +281,7 @@ def test_attack_consequences_canceled():
         trigger_conditions=[Trigger(event_type=EventType.ATTACK, event_phase=EventPhase.EXECUTION, event_source_entity_uuid=attacker.uuid, event_target_entity_uuid=defender.uuid)],
         event_processor=lambda e, _: e.cancel(status_message="Canceled"),
     )
-    EventQueue.add_event_handler(EventType.ATTACK, EventPhase.EXECUTION, attacker.uuid, handler)
+    EventQueue.add_event_handler(handler)
     try:
         with patch.object(Entity, "attack_bonus", autospec=True, side_effect=lambda self, weapon_slot=WeaponSlot.MAIN_HAND, target_entity_uuid=None: ModifiableValue.create(source_entity_uuid=self.uuid, target_entity_uuid=target_entity_uuid, base_value=2, value_name="Attack Bonus")), \
             patch.object(Entity, "ac_bonus", autospec=True, side_effect=lambda self, target_entity_uuid=None: ModifiableValue.create(source_entity_uuid=self.uuid, target_entity_uuid=target_entity_uuid, base_value=10, value_name="AC")):
@@ -599,7 +599,7 @@ def test_attack_consequences_canceled_after_roll():
         trigger_conditions=[Trigger(event_type=EventType.ATTACK, event_phase=EventPhase.EXECUTION, event_source_entity_uuid=attacker.uuid, event_target_entity_uuid=defender.uuid)],
         event_processor=lambda e, _: e.cancel(status_message="Canceled after roll") if e.dice_roll else e,
     )
-    EventQueue.add_event_handler(EventType.ATTACK, EventPhase.EXECUTION, attacker.uuid, handler)
+    EventQueue.add_event_handler(handler)
     try:
         with patch.object(Entity, "roll_d20", return_value=_make_attack_roll(attacker.uuid, defender.uuid, 10, 12, 2)), \
             patch.object(Entity, "get_damages", return_value=[]), \

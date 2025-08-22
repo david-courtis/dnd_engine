@@ -367,8 +367,6 @@ def test_event_handlers_conditions_and_immunities():
     assert block.event_handlers[handler.uuid] is handler
     assert block.event_handlers_by_trigger[trigger] == [handler]
     assert block.event_handlers_by_simple_trigger[trigger] == [handler]
-
-    EventQueue.add_event_handler(None, None, block.uuid, handler)
     block.remove_event_handler(handler)
     assert handler.uuid not in block.event_handlers
     assert block.event_handlers_by_trigger[trigger] == []
