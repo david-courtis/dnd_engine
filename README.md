@@ -3,6 +3,52 @@
 See [API documentation](docs/API.md) for available routes.
 See [API data models](docs/data_models.md) for request and response schemas.
 
+## Feature Roadmap
+
+- [X] Core event system for game phases
+- [X] Modular character stats block
+- [X] Ability scores & modifiers
+- [X] Skills with proficiency/expertise
+- [X] Saving throws with proficiency
+- [X] Health: hit points, temp HP, resistances
+- [X] Equipment slots with attack/damage/AC bonuses
+- [X] Action economy (actions, bonus actions, reactions, movement)
+- [X] Condition tracking
+- [X] Senses and vision modes
+- [X] Unit Tests
+- [ ] Equipment/item creation
+- [ ] Spellcasting system
+
+  - [ ] Spell DC
+  - [ ] Attack bonus
+- [ ] Initiative tracking
+- [ ] Currency tracking
+- [ ] Inspiration
+- [ ] Passive skill scores
+- [ ] Attunement slot management
+- [ ] Character personality, appearance (dynamic), alignment, languages
+- [ ] Feat system
+- [ ] Levels & XP tracking
+- [ ] Class and subclass framework
+- [ ] Race and background traits
+- [ ] Equipment and tool proficiencies
+- [ ] Multiple movement speeds (fly run swim)
+- [ ] Inventory system
+- [ ] Inventory weight management and encumbrance
+- [ ] Spell concentration tracking
+- [ ] Turn/round progression
+- [ ] Short and long rests
+- [ ] Exhaustion levels
+- [ ] Resource tracking
+- [ ] Item charges and ammunition
+- [ ] Death‑saving throws and stabilization rules for downed characters
+- [ ] Size categories and reach
+- [ ] Environmental hazards and difficult terrain effects
+- [ ] Vertical environments
+- [ ] Cover and flanking mechanics to influence attack advantage/disadvantage
+- [ ] Multiclass characters
+- [ ] Spellcasting components
+
 ## 1. Core Architecture Overview
 
 This D&D 5e game engine is built on a sophisticated event-driven architecture with component-based entities. The system models D&D mechanics through several interacting subsystems:
@@ -67,6 +113,7 @@ The value system is the foundation for all game mechanics.
 `ModifiableValue` is the core building block that represents any value that can be modified (ability scores, AC, saving throws, etc.).
 
 Key features:
+
 - Base value that can be modified through different channels
 - Multiple modification sources with different priorities
 - Support for special statuses (advantage, critical, auto-hit)
@@ -116,6 +163,7 @@ Entities are composed of specialized component "blocks" that provide different f
 ### 4.1 BaseBlock
 
 All blocks inherit from `BaseBlock`, which provides:
+
 - Registry integration
 - Value management
 - Target propagation
@@ -138,6 +186,7 @@ Entity
 ### 4.3 Component Interaction
 
 Components interact through:
+
 1. Direct method calls when immediate response is needed
 2. Event system for reactions and interrupts
 3. Value cross-propagation for mutual effects
@@ -145,6 +194,7 @@ Components interact through:
 ### 4.4 Specialized Components
 
 Each component specializes in one aspect of game mechanics:
+
 - **AbilityScores**: Base attributes and modifiers
 - **SkillSet**: Skill proficiencies and bonuses
 - **Health**: Damage tracking and resistances (death saves handled externally)
@@ -173,6 +223,7 @@ class Event(BaseObject):
 ### 5.2 Event Lifecycle
 
 Events progress through phases:
+
 1. **DECLARATION**: Initial intent (e.g., "I want to attack")
 2. **EXECUTION**: Action execution (e.g., rolling dice)
 3. **EFFECT**: Applying effects (e.g., dealing damage)
@@ -249,11 +300,13 @@ BaseCondition (parent)
 ```
 
 The parent condition:
+
 - Manages the overall effect lifecycle
 - Registers event handlers
 - Tracks subconditions
 
 The subconditions:
+
 - Apply actual modifiers to the entity
 - Are removed when the parent is removed
 - Can be added/removed dynamically
@@ -298,6 +351,7 @@ Example flow:
 ### 6.4. Condition Removal Cascade
 
 When a parent condition is removed:
+
 1. It removes all registered subconditions
 2. It removes all registered event handlers
 3. Each subcondition removes its modifiers
@@ -309,12 +363,14 @@ This ensures clean cleanup and prevents dangling effects.
 **CRITICAL POINT**: Conditions themselves should be immutable after application. Any state changes must happen through the creation/removal of subconditions.
 
 ❌ WRONG:
+
 ```python
 def event_handler(event, entity_uuid):
     condition.some_value += 1  # WRONG! Directly modifying condition state
 ```
 
 ✅ CORRECT:
+
 ```python
 def event_handler(event, entity_uuid):
     # Create an event that will create/remove subconditions
@@ -366,12 +422,12 @@ class Action(BaseObject):
 def apply(self, parent_event: Optional[Event] = None) -> Optional[Event]:
     # 1. Declare action
     event = self.create_declaration_event(parent_event)
-    
+  
     # 2. Check prerequisites
     if event.canceled:
         return event
     event = self.check_prerequisites(event)
-    
+  
     # 3. Apply consequences if prerequisites met
     if event.canceled:
         return event
@@ -386,19 +442,19 @@ Actions automatically handle event phases:
 def apply_consequences(self, event: Event) -> Optional[Event]:
     # Move to EXECUTION phase
     event = event.phase_to(EventPhase.EXECUTION)
-    
+  
     # Apply each consequence in sequence
     for consequence_name, consequence_func in self.consequences.items():
         event = consequence_func(event, event.source_entity_uuid)
         if event.canceled:
             return event
-        
+      
         # Optional revalidation of prerequisites
         if self.revalidate_prerequisites:
             event = self.check_prerequisites(event)
             if event.canceled:
                 return event
-    
+  
     # Move to COMPLETION phase
     return event.phase_to(EventPhase.COMPLETION)
 ```
@@ -463,21 +519,22 @@ Example: Counterspelling a spell being cast
 ### 8.3 Implementation Guidelines
 
 1. **Separation of Concerns**
+
    - Parent conditions handle lifecycle and event registration
    - Subconditions handle actual modification application
    - Event handlers coordinate subcondition creation/removal
-
 2. **Clean Removal**
+
    - All effects must be removable
    - Register all event handlers and subconditions
    - Use UUIDs rather than direct references
-
 3. **State Management**
+
    - Never modify condition state after application
    - Use subconditions to represent state changes
    - Use `partial` for handlers that need to maintain state
-
 4. **Event Propagation**
+
    - Respect event phase progression
    - Create new events rather than modifying existing ones
    - Use event hierarchies (parent/child) for related effects
@@ -499,7 +556,7 @@ class InvisibilitySpell(BaseCondition):
         invisible = InvisibleCondition(...)
         invisible.apply(event)
         sub_conditions_uuids.append(invisible.uuid)
-        
+      
         # Add event handler to end invisibility on attack
         end_handler = EventHandler(
             trigger_conditions=[
