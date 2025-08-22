@@ -14,6 +14,8 @@ from dnd.actions import (
     Attack,
     AttackEvent,
     attack_factory,
+    Move,
+    MovementEvent,
 )
 from dnd.core.base_actions import ActionEvent, Cost, StructuredAction
 from dnd.core.events import (
@@ -353,7 +355,7 @@ def test_validate_line_of_sight_source_not_entity():
         event_type=EventType.BASE_ACTION,
     )
 
-    with patch.object(Entity, "get", side_effect=lambda u: {} if u == source_uuid else target):
+    with patch.object(Entity, "get", side_effect=lambda u: object() if u == source_uuid else target):
         result = validate_line_of_sight(event, source_uuid)
 
     assert result.canceled
@@ -371,7 +373,7 @@ def test_validate_line_of_sight_target_not_entity():
         event_type=EventType.BASE_ACTION,
     )
 
-    with patch.object(Entity, "get", side_effect=lambda u: source if u == source.uuid else {}):
+    with patch.object(Entity, "get", side_effect=lambda u: source if u == source.uuid else object()):
         result = validate_line_of_sight(event, source.uuid)
 
     assert result.canceled
@@ -443,7 +445,7 @@ def test_validate_range_source_not_entity():
         weapon_slot=WeaponSlot.MAIN_HAND,
     )
 
-    with patch.object(Entity, "get", side_effect=lambda u: {} if u == source_uuid else target):
+    with patch.object(Entity, "get", side_effect=lambda u: object() if u == source_uuid else target):
         result = Attack.validate_range(event, source_uuid)
 
     assert result.canceled
@@ -560,7 +562,7 @@ def test_attack_consequences_source_not_entity():
         phase=EventPhase.EXECUTION,
     )
 
-    with patch.object(Entity, "get", side_effect=lambda u: {} if u == source_uuid else defender):
+    with patch.object(Entity, "get", side_effect=lambda u: object() if u == source_uuid else defender):
         result = Attack.attack_consequences(event, source_uuid)
 
     assert result.canceled
@@ -579,7 +581,7 @@ def test_attack_consequences_target_not_entity():
         phase=EventPhase.EXECUTION,
     )
 
-    with patch.object(Entity, "get", side_effect=lambda u: attacker if u == attacker.uuid else {}):
+    with patch.object(Entity, "get", side_effect=lambda u: attacker if u == attacker.uuid else object()):
         result = Attack.attack_consequences(event, attacker.uuid)
 
     assert result.canceled
@@ -797,6 +799,70 @@ def test_attack_apply_costs_delegates():
         result = action._apply_costs(completion_event)
     mock_applier.assert_called_once_with(completion_event, action.source_entity_uuid)
     assert result is completion_event
+
+
+def test_move_action_success_flow():
+    mover = Entity.create(uuid4(), name="Mover")
+    end_pos = (1, 0)
+    path = [end_pos]
+    mover.senses.paths[end_pos] = path
+
+    action = Move(source_entity_uuid=mover.uuid, target_entity_uuid=mover.uuid, end_position=end_pos)
+    assert action.path == path
+    assert action.costs and action.costs[0].cost == len(path)
+
+    declaration = action._create_declaration_event()
+    execution = action._validate(declaration)
+
+    with patch.object(Entity, "update_entity_position", side_effect=lambda e, pos: setattr(e, "position", pos)), \
+         patch.object(Entity, "update_all_entities_senses", return_value=None):
+        completion = action._apply(execution)
+
+    assert completion.phase == EventPhase.COMPLETION
+    assert mover.position == end_pos
+
+    before = mover.action_economy.movement.self_static.normalized_score
+    final = action._apply_costs(completion)
+    assert final.phase == EventPhase.COMPLETION
+    assert mover.action_economy.movement.self_static.normalized_score == before - len(path)
+
+
+def test_move_apply_no_path():
+    mover = Entity.create(uuid4(), name="Mover")
+    action = Move(source_entity_uuid=mover.uuid, target_entity_uuid=mover.uuid, end_position=(1, 0))
+    action.path = None
+    execution = MovementEvent(
+        name="Movement",
+        source_entity_uuid=mover.uuid,
+        start_position=mover.position,
+        end_position=(1, 0),
+        path=None,
+        phase=EventPhase.EXECUTION,
+    )
+    result = action._apply(execution)
+    assert result.canceled
+    assert result.status_message == "No path found for Movement"
+
+
+def test_move_apply_uses_event_path_when_missing():
+    mover = Entity.create(uuid4(), name="Mover")
+    action = Move(source_entity_uuid=mover.uuid, target_entity_uuid=mover.uuid, end_position=(1, 0))
+    action.path = None
+    action.costs = []
+    execution = MovementEvent(
+        name="Movement",
+        source_entity_uuid=mover.uuid,
+        start_position=mover.position,
+        end_position=(1, 0),
+        path=[(1, 0)],
+        phase=EventPhase.EXECUTION,
+    )
+    with patch.object(Entity, "update_entity_position", side_effect=lambda e, pos: setattr(e, "position", pos)), \
+         patch.object(Entity, "update_all_entities_senses", return_value=None):
+        result = action._apply(execution)
+    assert result.phase == EventPhase.COMPLETION
+    assert action.path == [(1, 0)]
+    assert action.costs and action.costs[0].cost == 1
 
 
 def test_attack_factory_creates_structured_action():

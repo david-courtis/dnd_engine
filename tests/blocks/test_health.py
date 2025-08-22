@@ -5,6 +5,7 @@ import pytest
 from dnd.blocks.health import Health, HealthConfig, HitDiceConfig, HitDice
 from dnd.core.modifiers import DamageType, ResistanceStatus
 from dnd.core.values import ModifiableValue
+from dnd.core.modifiers import NumericalModifier
 from app.models.health import HealthSnapshot
 
 
@@ -195,3 +196,61 @@ def test_roll_death_save_outcomes():
     h4.take_damage(23, DamageType.SLASHING, source)
     assert h4.roll_death_save(8) is False
     assert h4.death_save_failures == 1
+
+
+def test_hit_dice_roll_mode_and_modifiers(monkeypatch):
+    source = uuid4()
+    config = HitDiceConfig(
+        hit_dice_value=6,
+        hit_dice_count=1,
+        mode="roll",
+        hit_dice_value_modifiers=[("bonus", 2)],
+        hit_dice_count_modifiers=[("extra", 1)],
+    )
+    hd = HitDice.create(source_entity_uuid=source, config=config)
+    assert hd.hit_dice_value.score == 8
+    assert hd.hit_dice_count.score == 2
+
+    monkeypatch.setattr("dnd.blocks.health.randint", lambda a, b: b)
+    assert hd.hit_points == 16
+
+
+def test_health_create_with_modifiers():
+    source = uuid4()
+    cfg = HealthConfig(
+        hit_dices=[HitDiceConfig(hit_dice_value=6, hit_dice_count=1, mode="maximums")],
+        max_hit_points_bonus=5,
+        max_hit_points_bonus_modifiers=[("buff", 2)],
+        temporary_hit_points=3,
+        temporary_hit_points_modifiers=[("temp", 4)],
+        damage_reduction=1,
+        damage_reduction_modifiers=[("shield", 2)],
+    )
+    h = Health.create(source_entity_uuid=source, config=cfg)
+    assert h.max_hit_points_bonus.score == 7
+    assert h.temporary_hit_points.score == 7
+    assert h.damage_reduction.score == 3
+
+
+def test_take_damage_input_validation():
+    h = create_health()
+    source = uuid4()
+    with pytest.raises(ValueError):
+        h.take_damage(-1, DamageType.SLASHING, source)
+    with pytest.raises(ValueError):
+        h.take_damage(1, "invalid", source)
+    h.temporary_hit_points.self_static.add_value_modifier(
+        NumericalModifier(source_entity_uuid=source, target_entity_uuid=h.source_entity_uuid, name="neg", value=-10)
+    )
+    with pytest.raises(ValueError):
+        h.take_damage(1, DamageType.SLASHING, source)
+
+
+def test_heal_with_remaining_temp_hp():
+    h = create_health()
+    source = uuid4()
+    h.damage_taken = 7
+    h.add_temporary_hit_points(3, source)
+    h.heal(2)
+    assert h.damage_taken == 5
+    

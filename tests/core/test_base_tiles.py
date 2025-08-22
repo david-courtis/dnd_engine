@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
-from dnd.core.base_tiles import Tile
+from dnd.core.base_tiles import Tile, floor_factory, wall_factory, water_factory
 
 
 @pytest.fixture(autouse=True)
@@ -78,4 +78,15 @@ def test_adjacency_calculation():
         (2, 0), (2, 1), (2, 2),
     }
     assert adj == expected
+
+
+def test_tile_factories_and_get():
+    floor = floor_factory((0, 0))
+    wall = wall_factory((0, 1))
+    water = water_factory((1, 0))
+
+    assert Tile.get(floor.uuid) is floor
+    assert Tile.is_visible(floor.position) and Tile.is_walkable(floor.position)
+    assert not Tile.is_visible(wall.position) and not Tile.is_walkable(wall.position)
+    assert Tile.is_visible(water.position) and not Tile.is_walkable(water.position)
 
