@@ -80,6 +80,15 @@ def test_duration_on_condition_validation():
         Duration(duration=1, duration_type=DurationType.ON_CONDITION)
 
 
+def test_rounds_duration_initial_not_expired_and_decrements():
+    duration = Duration(duration=2, duration_type=DurationType.ROUNDS)
+    assert duration.is_expired is False
+    assert duration.progress() is False  # one round remaining
+    assert duration.is_expired is False
+    assert duration.progress() is True  # expires after second round
+    assert duration.is_expired is True
+
+
 def test_duration_progress_and_long_rest():
     rounds = Duration(duration=1, duration_type=DurationType.ROUNDS)
     assert rounds.progress() is True
